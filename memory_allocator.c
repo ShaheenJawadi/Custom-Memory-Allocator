@@ -62,3 +62,36 @@ memory_arena_t* init_arena(size_t size) {
     return arena;
 }
 
+void* arena_alloc(memory_arena_t* arena, size_t size) {
+    if (size == 0) return NULL;
+
+    size = ALIGN(size + sizeof(block_header_t));
+
+    block_header_t* block = find_free_block(arena, size);
+    if (!block) return NULL;
+
+    if (block->size >= size + MIN_BLOCK_SIZE + ALIGNMENT) {
+        block_header_t* new_block = (block_header_t*)((char*)block + size);
+        new_block->size = block->size - size;
+        new_block->is_free = true;
+        new_block->magic = MAGIC_NUMBER;
+        new_block->next = block->next;
+        new_block->prev = block;
+        if (block->next) {
+            block->next->prev = new_block;
+        }
+        block->next = new_block;
+        block->size = size;
+        new_block->checksum = calculate_checksum(new_block);
+    }
+
+    block->is_free = false;
+    block->checksum = calculate_checksum(block);
+
+    arena->used_memory += block->size;
+    if (arena->used_memory > arena->peak_memory) {
+        arena->peak_memory = arena->used_memory;
+    }
+
+    return (void*)((char*)block + sizeof(block_header_t));
+}
