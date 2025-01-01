@@ -12,6 +12,7 @@
 #define MIN_BLOCK_SIZE (sizeof(block_header_t) + ALIGNMENT)
 
 
+
 static uint32_t calculate_checksum(block_header_t* block) {
     uint32_t sum = 0;
     uint8_t* ptr = (uint8_t*)block;
@@ -19,6 +20,16 @@ static uint32_t calculate_checksum(block_header_t* block) {
         sum += ptr[i];
     }
     return sum;
+}
+static block_header_t* find_free_block(memory_arena_t* arena, size_t size) {
+    block_header_t* current = arena->first_block;
+    while (current) {
+        if (current->is_free && current->size >= size) {
+            return current;
+        }
+        current = current->next;
+    }
+    return NULL;
 }
 
 
