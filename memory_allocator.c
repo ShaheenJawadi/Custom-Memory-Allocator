@@ -32,6 +32,10 @@ static block_header_t* find_free_block(memory_arena_t* arena, size_t size) {
     return NULL;
 }
 
+static void validate_block(block_header_t* block) {
+    assert(block->magic == MAGIC_NUMBER);
+    assert(block->checksum == calculate_checksum(block));
+}
 
 
 memory_arena_t* init_arena(size_t size) {
@@ -95,6 +99,37 @@ void* arena_alloc(memory_arena_t* arena, size_t size) {
 
     return (void*)((char*)block + sizeof(block_header_t));
 }
+
+void arena_free(memory_arena_t* arena, void* ptr) {
+    if (!ptr) return;
+
+    block_header_t* block = (block_header_t*)((char*)ptr - sizeof(block_header_t));
+    validate_block(block);
+
+    arena->used_memory -= block->size;
+    block->is_free = true;
+
+    if (block->next && block->next->is_free) {
+        block->size += block->next->size;
+        block->next = block->next->next;
+        if (block->next) {
+            block->next->prev = block;
+        }
+    }
+
+    if (block->prev && block->prev->is_free) {
+        block->prev->size += block->size;
+        block->prev->next = block->next;
+        if (block->next) {
+            block->next->prev = block->prev;
+        }
+        block = block->prev;
+    }
+
+    block->checksum = calculate_checksum(block);
+}
+
+
 
 void destroy_arena(memory_arena_t* arena) {
     if (!arena) return;
