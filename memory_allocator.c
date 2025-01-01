@@ -95,3 +95,9 @@ void* arena_alloc(memory_arena_t* arena, size_t size) {
 
     return (void*)((char*)block + sizeof(block_header_t));
 }
+
+void destroy_arena(memory_arena_t* arena) {
+    if (!arena) return;
+    free(arena->start);
+    free(arena);
+}
