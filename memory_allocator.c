@@ -40,10 +40,10 @@ static void validate_block(block_header_t* block) {
 
 memory_arena_t* init_arena(size_t size) {
     size = ALIGN(size);
-
+// Allocate memory for arena control structure
     memory_arena_t* arena = malloc(sizeof(memory_arena_t));
     if (!arena) return NULL;
-
+    // Allocate memory pool
     arena->start = malloc(size);
     if (!arena->start) {
         free(arena);
@@ -54,7 +54,7 @@ memory_arena_t* init_arena(size_t size) {
     arena->min_alloc = MIN_BLOCK_SIZE;
     arena->used_memory = 0;
     arena->peak_memory = 0;
-
+    // Initialize first block
     arena->first_block = (block_header_t*)arena->start;
     arena->first_block->size = size;
     arena->first_block->is_free = true;
@@ -68,9 +68,9 @@ memory_arena_t* init_arena(size_t size) {
 
 void* arena_alloc(memory_arena_t* arena, size_t size) {
     if (size == 0) return NULL;
-
+    // Align size and add header size
     size = ALIGN(size + sizeof(block_header_t));
-
+    // Find a free block
     block_header_t* block = find_free_block(arena, size);
     if (!block) return NULL;
 
@@ -88,27 +88,30 @@ void* arena_alloc(memory_arena_t* arena, size_t size) {
         block->size = size;
         new_block->checksum = calculate_checksum(new_block);
     }
-
+    // Update block metadata
     block->is_free = false;
     block->checksum = calculate_checksum(block);
-
+    // Update arena statistics
     arena->used_memory += block->size;
     if (arena->used_memory > arena->peak_memory) {
         arena->peak_memory = arena->used_memory;
     }
 
+    // Return pointer to usable memory (after header)
     return (void*)((char*)block + sizeof(block_header_t));
 }
 
 void arena_free(memory_arena_t* arena, void* ptr) {
     if (!ptr) return;
-
+    // Get block header
     block_header_t* block = (block_header_t*)((char*)ptr - sizeof(block_header_t));
+    // Validate block
     validate_block(block);
-
+    // Update arena statistics
     arena->used_memory -= block->size;
+    // Update arena statistics
     block->is_free = true;
-
+    // Attempt to merge with next block if it's free
     if (block->next && block->next->is_free) {
         block->size += block->next->size;
         block->next = block->next->next;
@@ -117,6 +120,7 @@ void arena_free(memory_arena_t* arena, void* ptr) {
         }
     }
 
+    // Attempt to merge with previous block if it's free
     if (block->prev && block->prev->is_free) {
         block->prev->size += block->size;
         block->prev->next = block->next;
@@ -125,7 +129,7 @@ void arena_free(memory_arena_t* arena, void* ptr) {
         }
         block = block->prev;
     }
-
+    // Update checksum after modifications
     block->checksum = calculate_checksum(block);
 }
 
